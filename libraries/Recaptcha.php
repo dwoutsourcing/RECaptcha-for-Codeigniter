@@ -60,8 +60,6 @@ class Recaptcha {
     protected $theme = "RECAPTCHA THEME";
 
     function __construct() {
-            log_message('debug', "RECAPTCHA Class Initialized.");
-            
             $this->_ci =& get_instance();
             
             //Load the CI Config file for recaptcha
@@ -97,8 +95,8 @@ class Recaptcha {
      */
     function recaptcha_qsencode ($data) {
         $req = "";
-        foreach ( $data as $key => $value )
-            $req .= $key . '=' . urlencode( stripslashes($value) ) . '&';
+        foreach ($data as $key => $value)
+            $req .= $key . '=' . urlencode(stripslashes($value)) . '&';
 
         // Cut the last '&'
         $req=substr($req,0,strlen($req)-1);
@@ -116,28 +114,27 @@ class Recaptcha {
      * @return array response
      */
     function recaptcha_http_post($host, $path, $data, $port = 80) {
-
-        $req = $this->recaptcha_qsencode ($data);
-
-        $http_request  = "POST $path HTTP/1.0\r\n";
-        $http_request .= "Host: $host\r\n";
-        $http_request .= "Content-Type: application/x-www-form-urlencoded;\r\n";
-        $http_request .= "Content-Length: " . strlen($req) . "\r\n";
-        $http_request .= "User-Agent: reCAPTCHA/PHP\r\n";
-        $http_request .= "\r\n";
-        $http_request .= $req;
-
-        $response = '';
-        if( false == ( $fs = @fsockopen($host, $port, $errno, $errstr, 10) ) ) {
-            die ('Could not open socket');
+		$add_headers = array("Host: $host");
+        $curl = curl_init('http://' . $host . ':' . $port . $path);
+        
+        curl_setopt($curl, CURLOPT_POST, true);
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+        curl_setopt($curl, CURLOPT_USERAGENT, 'reCAPTCHA/PHP');
+        curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($curl, CURLOPT_HEADER, false);
+        curl_setopt($curl, CURLOPT_HTTPHEADER, $add_headers);
+        
+        if (isset($_ENV['http_proxy']) && !empty ($_ENV['http_proxy'])) {
+            curl_setopt($curl, CURLOPT_HTTPPROXYTUNNEL, true);
+            curl_setopt($curl, CURLOPT_PROXYTYPE, CURLPROXY_HTTP);
+            curl_setopt($curl, CURLOPT_PROXY, $_ENV['http_proxy']);
         }
 
-        fwrite($fs, $http_request);
-
-        while ( !feof($fs) )
-            $response .= fgets($fs, 1160); // One TCP-IP packet
-        fclose($fs);
-        $response = explode("\r\n\r\n", $response, 2);
+        $response = curl_exec($curl);
+        if ($response === false) die("Error connecting to $host.");
+        $response = preg_split('#\s#', $response);
 
         return $response;
     }
@@ -199,8 +196,6 @@ class Recaptcha {
             die ("For security reasons, you must pass the remote ip to reCAPTCHA");
         }
 
-
-
         //discard spam submissions
         if ($challenge == null || strlen($challenge) == 0 || $response == null || strlen($response) == 0) {
 
@@ -215,10 +210,10 @@ class Recaptcha {
                 'remoteip' => $remoteip,
                 'challenge' => $challenge,
                 'response' => $response
-            ) + $extra_params
-        );
+           ) + $extra_params
+       );
 
-        $answers = explode ("\n", $response [1]);
+        $answers = $response;
 
 
         if (trim ($answers [0]) == 'true') {
@@ -277,7 +272,7 @@ class Recaptcha {
         $ky = pack('H*', $this->privkey);
         $cryptmail = $this->recaptcha_aes_encrypt ($email, $ky);
 
-        return "http://www.google.com/recaptcha/mailhide/d?k=" . $this->public_key . "&c=" . $this->recaptcha_mailhide_urlbase64 ($cryptmail);
+        return "https://www.google.com/recaptcha/mailhide/d?k=" . $this->public_key . "&c=" . $this->recaptcha_mailhide_urlbase64 ($cryptmail);
     }
 
     /**
@@ -286,7 +281,7 @@ class Recaptcha {
      * the email is then displayed as john...@example.com
      */
     function recaptcha_mailhide_email_parts ($email) {
-        $arr = preg_split("/@/", $email );
+        $arr = preg_split("/@/", $email);
 
         if (strlen ($arr[0]) <= 4) {
             $arr[0] = substr ($arr[0], 0, 1);
@@ -315,13 +310,13 @@ class Recaptcha {
 
     function checkIfIsValid()
     {
-        if( $this->getIsValid() )
+        if($this->getIsValid())
         {
             return $this->getIsValid();
         }
         else
         {
-            return array( $this->getIsValid(), $this->getError() );
+            return array($this->getIsValid(), $this->getError());
         }
     }
 
